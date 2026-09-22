@@ -8,30 +8,9 @@
 #include "builtin.h"
 
 
-#define DSH_PARSE_BUFSIZE 16
 
-int dsh_launch(char *argv[]) {
-	pid_t p = fork();
-	int wstatus;
 
-	if (p == 0) {
-		/* child process */
-		execvp(argv[0], argv);
-		perror("dsh launching: launched process shouldn't have returned");
-	} else if (p < 0) {
-		perror("can't fork process");
-		exit(EXIT_FAILURE);
-	} else {
-		/* parent process */
-		do {
-			waitpid(p, &wstatus, WUNTRACED);
-		} while (!WIFEXITED(wstatus) && !WIFSIGNALED(wstatus));
-	}
-
-	return 0;		
-}
-
-/* read user input line */
+/* return user entered line */
 char *dsh_read(void) {
 	char *lineptr = NULL;
 	ssize_t s = 0;
@@ -47,12 +26,13 @@ char *dsh_read(void) {
 	return lineptr;
 }
 
-/* parses the user input line to args */
+/* return tokenized line */ 
 #define DSH_PARSE_DELIM " \t\n"
+#define DSH_PARSE_BUFSIZE 16
 
 char **dsh_parse(char *line) {
-	char **tokens = NULL;
-	char *token = strtok(line, DSH_PARSE_DELIM);
+	char **tokens	= NULL;
+	char *token		= strtok(line, DSH_PARSE_DELIM);
 	unsigned int bufsize = 0;
 	size_t pos;
 
@@ -62,6 +42,7 @@ char **dsh_parse(char *line) {
 			tokens = realloc( tokens, (bufsize += DSH_PARSE_BUFSIZE) );
 			if (tokens == NULL) {
 				perror("dsh_parse -> realloc()");
+				free(line);
 				exit(EXIT_FAILURE);
 			}
 		}
@@ -74,6 +55,29 @@ char **dsh_parse(char *line) {
 	return tokens;
 }
 
+/* launch external Linux builtin program and return status */
+int dsh_launch(char *argv[]) {
+	pid_t p = fork();
+	int wstatus;
+
+	if (p == 0) {
+		/* child process */
+		execvp(argv[0], argv);
+		perror("dsh launching: launched process shouldn't have returned");
+		exit(EXIT_FAILURE);
+	} else if (p < 0) {
+		perror("can't fork process");
+		return 1;
+	} else {
+		/* parent process */
+		do {
+			waitpid(p, &wstatus, WUNTRACED);
+		} while (!WIFEXITED(wstatus) && !WIFSIGNALED(wstatus));
+	}
+	return 0;
+}
+
+/* decide between Linux and dsh builtin program, return status */
 int dsh_exec(char *argv[]) {
 
 	for (int i=0; i<dsh_builtin_n; i++) {
@@ -87,9 +91,9 @@ int dsh_exec(char *argv[]) {
 
 
 int main(int argc, char *argv[]) {
-	char *line;
-	char **args;
-	int status;
+	char	*line;
+	char	**args;
+	int		status;
 	
 	do {
 		printf("> ");

@@ -38,7 +38,7 @@ int (*builtin_func[])(char *[]) = {
 	dsh_exit
 };
 
-int dsh_builtin_n = 3;// sizeof(builtin_str) / sizeof(char*);
+int dsh_builtin_n = sizeof(builtin_str) / sizeof(char*);
 
 
 
